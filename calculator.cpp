@@ -1,3 +1,4 @@
+//don't use these
 #include <iostream>
 #include <cmath>
 #include <vector>
@@ -5,6 +6,7 @@
 
 using namespace std;
 
+//old
 class Calculator {
     vector<float>* mem_stack;
 

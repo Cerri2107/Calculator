@@ -5,13 +5,16 @@
 
 using namespace std;
 
+//calculator class
 class Calculator {
-
+	//keeps every old result
     vector<float>* mem_stack;
+	//keeps every part of an operation
 	vector<string>* lineArgs;
 	int cnt = 0;
 
     public:
+		//keeps the result of any operation, and its validity
         struct Output {
             float value;
             bool valid;
@@ -28,15 +31,14 @@ class Calculator {
         ~Calculator() {
             delete mem_stack;
         }
-
-        float memPeek() {
-            return (*mem_stack).back();
-        }
-
+		
+		//return memorized result of a set age
         float memPeek(const int& age) {
             return (*mem_stack)[(*mem_stack).size() - age];
         }
 
+		//recursively converts an "operand" which includes r_{num} and sqrt_{num}
+		//to real numbers kept in the struct Output
 		Output strToOperand(const string& operand) {
 			Output output;
 			string& prefix = operand.substr(0, operand.find_first_of('_'));
@@ -62,6 +64,7 @@ class Calculator {
 			}
 		}
 
+		//recursively executes the operation
         Output executeOp(const Output& o_left, const string& op, string& right) {
             Output out = strToOperand(right);
 
@@ -84,6 +87,7 @@ class Calculator {
 				return out;
         }
 
+		//starts the execution of an operation
         Output lineOp(string& line) {
 			Output out;
 			(*lineArgs).push_back("");

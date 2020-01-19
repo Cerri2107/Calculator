@@ -1,7 +1,9 @@
+//don't use these
 #pragma once
 #include <vector>
 #include <string>
 
+//old
 class Calculator {
 private:
     std::vector<float>* mem_stack;
