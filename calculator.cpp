@@ -1,142 +1,182 @@
-//don't use these
 #include <iostream>
 #include <cmath>
-#include <vector>
+#include <deque>
+#include <algorithm>
 #include <string>
 
-using namespace std;
+namespace cerri {
+	//deque wrapper
+	template<typename Type = float>
+	class deck {
+		std::deque<Type> deq;
+	public:
+		//return memorized result of a set age (how many operations ago it was saved)
+		Type peek(const size_t& age) {
+			return deq[deq.size() - age];
+		}
+		void push_back(const Type& value) {
+			deq.push_back(value);
+		}
+		Type pop_front() {
+			Type out = deq.front();
+			deq.pop_front();
+			return out;
+		}
+		size_t size() {
+			return deq.size();
+		}
+	};
 
-//calculator class
-class Calculator {
-	//keeps every old result
-    vector<float>* mem_stack;
-	//keeps every part of an operation
-	vector<string>* lineArgs;
-	int cnt = 0;
+	//calculator class
+	class calculator {
+	public:
+		//can keep the result of any operation, and its validity
+		struct out_t {
+			float value = 0;
+			bool valid = true;
+		};
 
-    public:
-		//keeps the result of any operation, and its validity
-        struct Output {
-            float value;
-            bool valid;
-			Output() {
-				value = 0;
-				valid = true;
-			}
-        };
+	private:
+		deck<float> memory;										//keeps every old result
+		std::deque<std::string> operations;						//keeps every part of an operation
+		std::deque<std::string> ops_pr_1 { "*", "/", "^", "v" };//operators to execute first
+		std::deque<std::string> ops_pr_2 { "+", "-" };			//operators to execute second
+		std::deque<std::string>::iterator op_count;				//keeps track of which operator to execute
 
-        Calculator() {
-            mem_stack = new vector<float>;
-			lineArgs = new vector<string>;
-        }
-        ~Calculator() {
-            delete mem_stack;
-        }
-		
-		//return memorized result of a set age
-        float memPeek(const int& age) {
-            return (*mem_stack)[(*mem_stack).size() - age];
-        }
+		//returns iterator reference of next operation to execute
+		std::deque<std::string>::iterator nextop() {
+			std::deque<std::string>::iterator out;
+			out = std::find_first_of(operations.begin(), operations.end(), ops_pr_1.begin(), ops_pr_1.end());
+			if (out == operations.end())
+				out = std::find_first_of(operations.begin(), operations.end(), ops_pr_2.begin(), ops_pr_2.end());
+			return out;
+		}
+		//recursively converts an "operand" (which includes r_{num}, sqrt_{num}, etc...) to real numbers kept in the struct out_t
+		out_t strtoop(const std::string& operand) {
+			out_t output;
+			std::string prefix = operand.substr(0, operand.find_first_of('_'));
+			std::string suffix = operand.substr(operand.find_first_of('_') + 1);
 
-		//recursively converts an "operand" which includes r_{num} and sqrt_{num}
-		//to real numbers kept in the struct Output
-		Output strToOperand(const string& operand) {
-			Output output;
-			string& prefix = operand.substr(0, operand.find_first_of('_'));
-			string& suffix = operand.substr(operand.find_first_of('_') + 1);
-			if (prefix == "r") {
+			//checks for every preset prefix
+
+			#pragma region if "r"
+			if (prefix == "r") {						//r_{num} returns number of num age from "memory stack"
 				if (output.valid = isInt(suffix)) {
 					int age = stoi(suffix);
-					if (output.valid = age < (*mem_stack).size() + 1)
-						output.value = memPeek(age);
+					if (output.valid = age < memory.size() + 1)
+						output.value = memory.peek(age);
 				}
-                return output;
+				return output;
 			}
-			else if (prefix == "sqrt") {
-				Output num = strToOperand(suffix);
+			#pragma endregion
+
+			#pragma region if "sqrt"
+			else if (prefix == "sqrt") {				//sqrt_{num} square root of num
+				out_t num = strtoop(suffix);
 				if (output.valid = num.valid)
 					output.value = sqrtf(num.value);
 				return output;
 			}
-            else {
-				if (output.valid = isFloat(operand))
-					output.value = stof(operand);
-                return output;
+			#pragma endregion
+
+			#pragma region if "sqr"
+			else if (prefix == "sqr") {					//sqr_{num}	square of num
+				out_t num = strtoop(suffix);
+				if (output.valid = num.valid)
+					output.value = num.value * num.value;
+				return output;
 			}
+			#pragma endregion
+
+			#pragma region if a number
+			else {										//returns the suffix as a float number
+				if (output.valid = isFloat(suffix))
+					output.value = stof(suffix);
+				return output;
+			}
+			#pragma endregion
+
 		}
-
 		//recursively executes the operation
-        Output executeOp(const Output& o_left, const string& op, string& right) {
-            Output out = strToOperand(right);
+		out_t execop(const out_t& o_left, const std::string& op, std::string& right) {
+			out_t out = strtoop(right);
 
-			if (!(out.valid = out.valid && isOperator(op) && o_left.valid))
+			if (!(out.valid = out.valid && o_left.valid))
 				return out;
 
-            if (op == "+")
-                out.value = o_left.value + out.value;
-            else if (op == "-")
-                out.value = o_left.value - out.value;
-            else if (op == "*")
-                out.value = o_left.value * out.value;
-            else if (op == "/")
-                out.value = o_left.value / out.value;
+			#pragma region operations
+			if (op == "+")
+				out.value = o_left.value + out.value;
+			else if (op == "-")
+				out.value = o_left.value - out.value;
+			else if (op == "*")
+				out.value = o_left.value * out.value;
+			else if (op == "/")
+				out.value = o_left.value / out.value;
+			else if (op == "^")
+				out.value = powf(o_left.value, out.value);
+			else if (op == "v")
+				out.value = powf(o_left.value, 1 / out.value);
+			else {
+				out.valid = false;
+				return out;
+			}
+			#pragma endregion
 
-			cnt += 2;
-			if (cnt < (*lineArgs).size() - 1)
-            	return executeOp(out, (*lineArgs)[cnt + 1], (*lineArgs)[cnt + 2]);
+			operations.erase(op_count, op_count + 2);
+			op_count = nextop();
+			if (op_count != operations.end())
+				return execop(out, *op_count, *(op_count + 1));
 			else
 				return out;
-        }
+		}
 
+	public:
 		//starts the execution of a line of operations
-        Output lineOp(string& line) {
-			Output out;
-			(*lineArgs).push_back("");
-			string left, op, right;
+		out_t startop(std::string& line) {
+			out_t out;
+			operations.push_back("");
+			std::string left, op, right;
 			int i = 0;
-
-			while(line.length() > 0) {
+			while (line.length() > 0) {
 				if (line[0] == ' ') {
-					while(line[0] == ' ')
+					while (line[0] == ' ')
 						line = line.substr(1);
-					(*lineArgs).push_back("");
+					operations.push_back("");
 					i++;
 				}
-				(*lineArgs)[i].push_back(line[0]);
+				operations[i].push_back(line[0]);
 				line = line.substr(1);
 			}
 
-			if (out.valid = (*lineArgs).size() > 2 && (*lineArgs).size() % 2 == 1) {
-				cnt = 0;
-				out = executeOp(strToOperand((*lineArgs)[cnt]), (*lineArgs)[cnt + 1], (*lineArgs)[cnt + 2]);
+			if (out.valid = operations.size() > 2 && operations.size() % 2 == 1) {
+				op_count = nextop();
+				out = execop(strtoop(*(op_count - 1)), *op_count, *(op_count + 1));
 				if (out.valid)
-            		(*mem_stack).push_back(out.value);
+					memory.push_back(out.value);
 			}
 
-			(*lineArgs).erase((*lineArgs).begin(), (*lineArgs).end());
+			operations.erase(operations.begin(), operations.end());
 			return out;
-        }
-        
-        bool isOperator(const string& op) {
-            bool out;
-            out = op == "+" || op == "-" || op == "*" || op == "/";
-            return out;
-        }
-		bool isFloat(const string& s) {
-            bool out = true;
-			int dots = 0;
+		}
+		//return whether a string contains a valid float number
+		bool isFloat(const std::string& s) {
+			bool dot = false;
 			for (int i = 0; i < s.length(); i++)
 				if (!isdigit(s[i]) && s[i] != '.')
-					out = false;
-				else if (s[i] == '.')
-					dots++;
-            return out && dots < 2;
-        }
-		bool isInt(const string& s) {
-            bool out = true;
+					return false;
+				else if (s[i] == '.' && !dot)
+					dot = true;
+				else if (s[i] == '.' && dot)
+					return false;
+			return true;
+		}
+		//return whether a string contains a valid integer number
+		bool isInt(const std::string& s) {
 			for (int i = 0; i < s.length(); i++)
-				if (!isdigit(s[i]))
-					out = false;
-            return out;
-        }
-};
+				if (!isdigit(s[i])/* && i != 0 || s[i] != '-' || s[i] != '+'*/)
+					return false;
+			return true;
+		}
+	};
+}
