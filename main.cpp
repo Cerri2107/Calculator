@@ -5,20 +5,20 @@
 
 int main() {
     cerri::calculator calc;
-	cerri::calculator::out_t out;
+	cerri::calculator::out_type out;
     std::string input;
     do {
-        std::cout << "Write a sequence of operations: ";
+        std::cout << " Write an expression: ";
         getline(std::cin, input);
         if (input == "exit")
             break;
 		if (input != "") {
-			out = calc.startop(input);
+			out = calc.startex(input);
         	if (out.valid)
-				std::cout << "\t\t\tresult: " << out.value;
+				std::cout << "\t      result: " << out.value;
         	else
-				std::cout << "invalid operation";
-			std::cout << std::endl << "-------------------------------" << std::endl;
+				std::cout << "\t      result: invalid expression";
+			std::cout << std::endl << "---------------------" << std::endl;
 		}
 
     } while(true);
