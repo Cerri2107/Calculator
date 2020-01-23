@@ -2,7 +2,6 @@
 #include <string>
 #include "calculator.cpp"
 
-
 int main() {
     cerri::calculator calc;
 	cerri::calculator::out_type out;

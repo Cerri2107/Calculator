@@ -1,6 +1,7 @@
 .vscode
 *.pdb
 *.ilk
+*.exe
 
 # Prerequisites
 *.d

@@ -38,13 +38,23 @@ namespace cerri {
 		typedef std::deque<std::string> str_deque;
 		deck<float> memory;							//keeps every old result
 		str_deque tokens;							//keeps every "word" of an expression
-		//str_deque* single_exps;						//keeps every "part" of an expression divided by parentheses
 		str_deque ops_pr_1 { "*", "/", "^", "v" };	//operators to execute first
 		str_deque ops_pr_2 { "+", "-" };			//operators to execute second
-		str_deque::iterator op_count;				//keeps track of which operator is being executed
+		str_deque::iterator exec_point;				//keeps track of which operator is being executed
 
-		/*write a function that divides the expression in mini-expression by their parentheses*/
-
+		/*write a function that finds the last parenthesis divided snippet*/
+		std::pair<str_deque::iterator, str_deque::iterator> getnextsnippet() {
+			str_deque::iterator begin, end;
+			str_deque::reverse_iterator rbegin;
+			rbegin = std::find(tokens.rbegin(), tokens.rend(), "(");
+			if (rbegin != tokens.rend())
+				rbegin++;
+			begin = rbegin.base();
+			end = std::find(begin, tokens.end(), ")");
+			if (begin == tokens.end())
+				begin = tokens.begin();
+			return std::pair<str_deque::iterator, str_deque::iterator>(begin, end);
+		}
 		//returns a string deque containing the tokens of the expression
 		str_deque dividetokens(std::string exp) {
 			str_deque out;
@@ -65,9 +75,24 @@ namespace cerri {
 		//returns iterator reference of next operation to execute
 		str_deque::iterator nextop() {
 			str_deque::iterator out;
-			out = std::find_first_of(tokens.begin(), tokens.end(), ops_pr_1.begin(), ops_pr_1.end());
-			if (out == tokens.end())
-				out = std::find_first_of(tokens.begin(), tokens.end(), ops_pr_2.begin(), ops_pr_2.end());
+			std::pair<str_deque::iterator, str_deque::iterator> snip = getnextsnippet();
+			str_deque::iterator snip_begin = snip.first;
+			str_deque::iterator snip_end = snip.second;
+			out = std::find_first_of(snip_begin, snip_end, ops_pr_1.begin(), ops_pr_1.end());
+			if (out == snip_end)
+				out = std::find_first_of(snip_begin, snip_end, ops_pr_2.begin(), ops_pr_2.end());
+			size_t out_i = std::distance(tokens.begin(), out);
+			size_t end_i = std::distance(tokens.begin(), snip_end);
+			if (snip_end - snip_begin < 5) {
+				if (*snip_begin == "(") {
+					tokens.erase(snip_begin);
+					out_i--;
+					end_i--;
+				}
+				if (tokens.begin() + end_i != tokens.end())
+					tokens.erase(tokens.begin() + end_i);
+			}
+			out = tokens.begin() + out_i;
 			return out;
 		}
 		//recursively converts an "operand" (which includes r_{num}, sqrt_{num}, etc...) to real numbers kept in the struct out_t
@@ -142,11 +167,11 @@ namespace cerri {
 			}
 			#pragma endregion
 
-			*(op_count - 1) = std::to_string(out.value);
-			tokens.erase(op_count, op_count + 2);
-			op_count = nextop();
-			if (op_count != tokens.end())
-				return execop(strtoop(*(op_count - 1)), *op_count, *(op_count + 1));
+			*(exec_point - 1) = std::to_string(out.value);
+			tokens.erase(exec_point, exec_point + 2);
+			exec_point = nextop();
+			if (exec_point != tokens.end())
+				return execop(strtoop(*(exec_point - 1)), *exec_point, *(exec_point + 1));
 			else
 				return out;
 		}
@@ -158,10 +183,10 @@ namespace cerri {
 			tokens = dividetokens(exp);
 			
 			if (out.valid = tokens.size() > 2 && tokens.size() % 2 == 1) {
-				op_count = nextop();
-				if (out.valid = op_count != tokens.begin() && op_count != tokens.end()) {
+				exec_point = nextop();
+				if (out.valid = exec_point != tokens.begin() && exec_point != tokens.end()) {
 					try {
-						out = execop(strtoop(*(op_count - 1)), *op_count, *(op_count + 1));
+						out = execop(strtoop(*(exec_point - 1)), *exec_point, *(exec_point + 1));
 					}
 					catch (...) {
 						out.valid = false;
