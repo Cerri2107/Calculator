@@ -15,12 +15,13 @@ namespace cerri {
 
 		//defined string deque as a type for brevity
 		typedef std::deque<std::string> str_deque;
-		std::deque<float> memory;								//keeps every old result
-		str_deque tokens;								//keeps every "word" of an expression
-		str_deque ops_pr_1 { "^", "v", "log", "ln" };	//operators to execute first
-		str_deque ops_pr_2{ "*", "/" };					//operators to execute second
-		str_deque ops_pr_3 { "+", "-" };				//operators to execute last
-		str_deque::iterator exec_point;					//keeps track of which operator is being executed
+		std::deque<float> memory;			//keeps every old result
+		str_deque tokens;					//keeps every "word" of an expression
+		str_deque ops_pr_1 { "log", "ln" };	//operators to execute first
+		str_deque ops_pr_2 { "^", "v" };	//operators to execute first
+		str_deque ops_pr_3 { "*", "/" };	//operators to execute second
+		str_deque ops_pr_4 { "+", "-" };	//operators to execute last
+		str_deque::iterator exec_point;		//keeps track of which operator is being executed
 
 		//returns a pair containing begin and end iterators of the last parenthesis divided snippet in the tokens deque*/
 		std::pair<str_deque::iterator, str_deque::iterator> getnextsnippet() {
@@ -61,141 +62,181 @@ namespace cerri {
 			str_deque::iterator snip_begin = snip.first;
 			str_deque::iterator snip_end = snip.second;
 
-			out = std::find_first_of(snip_begin, snip_end, ops_pr_1.begin(), ops_pr_1.end());
-			if (out == snip_end) {
-				out = std::find_first_of(snip_begin, snip_end, ops_pr_2.begin(), ops_pr_2.end());
-				if (out == snip_end)
-					out = std::find_first_of(snip_begin, snip_end, ops_pr_3.begin(), ops_pr_3.end());
+			size_t beg_off = snip_begin - tokens.begin();
+			size_t end_off = snip_end - tokens.begin();
+			if (snip_begin != tokens.begin() && !isoperator(*(snip_begin - 1))) {
+				tokens.insert(snip_begin, "*");
+				beg_off++;
+				end_off++;
+				snip_begin = tokens.begin() + beg_off;
+				snip_end = tokens.begin() + end_off;
+			}
+			if (snip_end < tokens.end() - 1 && !isoperator(*(snip_end + 1))) {
+				tokens.insert(snip_end + 1, "*");
+				snip_begin = tokens.begin() + beg_off;
+				snip_end = tokens.begin() + end_off;
 			}
 
-			size_t out_i = std::distance(tokens.begin(), out);
-			size_t end_i = std::distance(tokens.begin(), snip_end);
 			if (snip_end - snip_begin < 5) {
 				if (*snip_begin == "(") {
 					tokens.erase(snip_begin);
-					out_i--;
-					end_i--;
+					end_off--;
 				}
-				if (tokens.begin() + end_i != tokens.end())
-					tokens.erase(tokens.begin() + end_i);
-				out = tokens.begin() + out_i;
+				if (tokens.begin() + end_off != tokens.end())
+					tokens.erase(tokens.begin() + end_off);
+				snip_begin = tokens.begin() + beg_off;
+				snip_end = tokens.begin() + end_off;
+			}
+
+			out = std::find_first_of(snip_begin, snip_end, ops_pr_1.begin(), ops_pr_1.end());
+			if (out == snip_end) {
+				out = std::find_first_of(snip_begin, snip_end, ops_pr_2.begin(), ops_pr_2.end());
+				if (out == snip_end) {
+					out = std::find_first_of(snip_begin, snip_end, ops_pr_3.begin(), ops_pr_3.end());
+					if (out == snip_end)
+						out = std::find_first_of(snip_begin, snip_end, ops_pr_4.begin(), ops_pr_4.end());
+				}
 			}
 
 			return out;
 		}
 		//recursively converts an "operand" (which includes r_{num}, sqrt_{num}, etc...) to real numbers kept in the struct out_t
 		out_t strtoop(const std::string& operand) {
-			out_t output;
-			std::string prefix = operand.substr(0, operand.find_first_of('('));
-			std::string suffix = operand.substr(prefix.length(), operand.find_last_of(')'));
+			out_t out;
+			size_t div = operand.find_first_of('_');
+			std::string prefix = operand.substr(0, div);
+			std::string suffix = div < operand.length() ? operand.substr(div + 1) : operand;
 
 			//checks the prefix for all the preset ones
 
 			#pragma region if "r"
 			if (prefix == "r") {						//r_{num} returns number of num age from memory
-				if (output.valid = isunsint(suffix)) {
+				if (out.valid = isunsint(suffix)) {
 					size_t age = stoi(suffix);
-					if (output.valid = age < memory.size() + 1)
-						output.value = memory[memory.size() - age];
+					if (out.valid = age < memory.size() + 1)
+						out.value = memory[memory.size() - age];
 				}
-				return output;
 			}
 			#pragma endregion
 
 			#pragma region if "sqrt"
 			else if (prefix == "sqrt") {				//sqrt_{num} square root of num
 				out_t num = strtoop(suffix);
-				if (output.valid = num.valid)
-					output.value = sqrtf(num.value);
-				return output;
+				if (out.valid = num.valid)
+					out.value = sqrtf(num.value);
 			}
 			#pragma endregion
 
 			#pragma region if "sqr"
 			else if (prefix == "sqr") {					//sqr_{num}	square of num
 				out_t num = strtoop(suffix);
-				if (output.valid = num.valid)
-					output.value = num.value * num.value;
-				return output;
+				if (out.valid = num.valid)
+					out.value = num.value * num.value;
 			}
 			#pragma endregion
 
 			#pragma region if "log"
-
-
-
+			else if (prefix == "log") {					//sqr_{num}	square of num
+				out_t num = strtoop(suffix);
+				if (out.valid = num.valid)
+					out.value = log10f(num.value);
+			}
 			#pragma endregion
 
 			#pragma region if "ln"
-
-
-
+			else if (prefix == "ln") {					//sqr_{num}	square of num
+				out_t num = strtoop(suffix);
+				if (out.valid = num.valid)
+					out.value = logf(num.value);
+			}
 			#pragma endregion
 
 			#pragma region if a constant
-
-
-
+			else if (prefix == "pi") {
+				if (out.valid = operand == "pi")
+					out.value = 3.1427f;
+			}
+			else if (prefix == "e") {
+				if (out.valid = operand == "e")
+					out.value = 2.7182f;
+			}
 			#pragma endregion
 
 			#pragma region if a number
 			else {										//returns the operand as a float number
-				if (output.valid = isfloat(operand))
-					output.value = stof(operand);
-				return output;
+				if (out.valid = isfloat(operand))
+					out.value = stof(operand);
 			}
 			#pragma endregion
 
+			return out;
 		}
-		//recursively executes the operation
-		out_t execop(const out_t& o_left, const std::string& op, const std::string& right) {
-			out_t out = strtoop(right);
+		//executes an operation which takes two numbers
+		out_t execute(const std::string& left, const std::string& op, const std::string& right) {
+			out_t o_left = strtoop(left);
+			out_t o_right = strtoop(right);
+			out_t out;
 
-			if (!(out.valid = out.valid && o_left.valid))
+			if (!(out.valid = o_left.valid && o_right.valid))
 				return out;
 
 			#pragma region operations
 			if (op == "+")
-				out.value = o_left.value + out.value;
+				out.value = o_left.value + o_right.value;
 			else if (op == "-")
-				out.value = o_left.value - out.value;
+				out.value = o_left.value - o_right.value;
 			else if (op == "*")
-				out.value = o_left.value * out.value;
+				out.value = o_left.value * o_right.value;
 			else if (op == "/")
-				out.value = o_left.value / out.value;
+				out.value = o_left.value / o_right.value;
 			else if (op == "^")
-				out.value = powf(o_left.value, out.value);
+				out.value = powf(o_left.value, o_right.value);
 			else if (op == "v")
-				out.value = powf(out.value, 1 / o_left.value);
-			else if (op == "log")
-				out.value = log10f(out.value);
-			else if (op == "ln")
-				out.value = logf(out.value);
+				out.value = powf(o_right.value, 1 / o_left.value);
 			else {
 				out.valid = false;
 				return out;
 			}
 			#pragma endregion
 
-			if (op == "log" || op == "ln") {
-				if (exec_point != tokens.begin() && !isoperator(*(exec_point - 1)))
-					tokens.insert(exec_point - 1, "*");
-				*(exec_point) = std::to_string(out.value);
-				tokens.erase(exec_point + 1, exec_point + 2);
-				exec_point = nextop();
-			}
-			else {
-				*(exec_point - 1) = std::to_string(out.value);
-				tokens.erase(exec_point, exec_point + 2);
-				exec_point = nextop();
-			}
-
+			*(exec_point - 1) = std::to_string(out.value);
+			tokens.erase(exec_point, exec_point + 2);
+			exec_point = nextop();
 			if (exec_point == tokens.end())
 				return out;
-			else if (*exec_point != "log" && *exec_point != "ln")
-				return execop(strtoop(*(exec_point - 1)), *exec_point, *(exec_point + 1));
+			else if (*exec_point == "log" || *exec_point == "ln")
+				return execute(*exec_point, *(exec_point + 1));
 			else
-				return execop(out_t(), *exec_point, *(exec_point + 1));			
+				return execute(*(exec_point - 1), *exec_point, *(exec_point + 1));
+		}
+		//executes an operation which takes one number
+		out_t execute(const std::string& op, const std::string& right) {
+			out_t o_right = strtoop(right);
+			out_t out;
+
+			if (!(out.valid = o_right.valid))
+				return out;
+
+			#pragma region operations
+			if (op == "log")
+				out.value = log10f(o_right.value);
+			else if (op == "ln")
+				out.value = logf(o_right.value);
+			else {
+				out.valid = false;
+				return out;
+			}
+			#pragma endregion
+
+			*(exec_point) = std::to_string(out.value);
+			tokens.erase(exec_point + 1, exec_point + 2);
+			exec_point = nextop();
+			if (exec_point == tokens.end())
+				return out;
+			else if (*exec_point == "log" || *exec_point == "ln")
+				return execute(*exec_point, *(exec_point + 1));
+			else
+				return execute(*(exec_point - 1), *exec_point, *(exec_point + 1));
 		}
 
 	public:
@@ -206,15 +247,11 @@ namespace cerri {
 			try {
 				tokens = dividetokens(exp);
 				exec_point = nextop();
-				if (exec_point == tokens.end())
-					out = strtoop(*(exec_point - 1));
-				else if (exec_point != tokens.end() - 1)
+				if (out.valid = exec_point != tokens.end() && exec_point != tokens.end() - 1)
 					if (*exec_point == "log" || *exec_point == "ln")
-						out = execop(out_t(), *exec_point, *(exec_point + 1));
-					else
-						out = execop(strtoop(*(exec_point - 1)), *exec_point, *(exec_point + 1));
-				else
-					out.valid = false;
+						out = execute(*exec_point, *(exec_point + 1));
+					else if (out.valid = exec_point != tokens.begin())
+						out = execute(*(exec_point - 1), *exec_point, *(exec_point + 1));
 			}
 			catch (...) {
 				out.valid = false;
